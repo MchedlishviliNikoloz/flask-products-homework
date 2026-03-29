@@ -62,16 +62,17 @@
 <body>
     <div class="container">
         <h1>🛒 Products List</h1>
-            <div class="product-card">
-                <div class="product-name">
-                    Product A
-                </div>
+            {% for item in items %}
+                <div class="product-card">
+                    <div class="product-name">
+                        {{ item.name }}
+                    </div>
 
-                <div class="product-price">
-                    $10.00
+                    <div class="product-price">
+                        ${{ item.price }}
+                    </div>
                 </div>
-            </div>
-
+            {% endfor %}
         <div class="footer">
             Flask + Jinja2 Demo
         </div>
