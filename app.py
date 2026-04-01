@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, url_for
 
 app = Flask(__name__)
 
@@ -19,17 +19,57 @@ def index():
 @app.route("/api/products")
 @app.route("/api/products/<search>")
 def get_products(search: str = None):
-    if search is None:
-        return products
+    result = products
+    min_price, max_price = request.args.get("min_price"), request.args.get("max_price")
+    limit = request.args.get("limit")
 
-    found_items = []
+    if search is not None:
+        result = [item for item in result if search.lower() in item['name'].lower()]
+
+    if min_price:
+        result = [item for item in result if int(min_price) <= item['price']]
+
+    if max_price:
+        result = [item for item in result if int(max_price) >= item['price']]
+
+    if limit:
+        result = result[:int(limit)]
+
+    return result
+
+@app.route("/api/products/id/<int:id>")
+def get_product_by_id(id: int):
     for item in products:
-        if search.lower() in item["name"].lower():
-            found_items.append(item)
+        if id == item['id']:
+            return item
+    return {"error": "Product not found"}
 
-    if not found_items:
-        return "No items found!"
-    return found_items
+@app.route("/products")
+def get_products_page():
+    min_price, max_price = request.args.get("min_price"), request.args.get("max_price")
+    result = products
+    if min_price:
+        result = [item for item in result if int(min_price) <= item['price']]
+
+    if max_price:
+        result = [item for item in result if int(max_price) >= item['price']]
+
+    return render_template("index.html", items=result)
+
+@app.route("/add-product", methods=["GET", "POST"])
+def add_product():
+    if request.method == "POST":
+        p_name = request.form.get('name')
+        p_price = request.form.get('price')
+        p_id = len(products) + 1
+        products.append({
+            'id': p_id,
+            'name': p_name,
+            'price': int(p_price)
+        })
+        return redirect(url_for("index"))
+
+    return render_template("add_product.html")
 
 if __name__ == "__main__":
     app.run(debug=True)
