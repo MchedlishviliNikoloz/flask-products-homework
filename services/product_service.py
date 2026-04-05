@@ -31,5 +31,6 @@ def add_product(new_data: dict, existing_data: list):
         return product_validate
 
     new_data['id'] = len(existing_data) + 1
+    new_data['price'] = int(new_data['price'])
     existing_data.append(new_data)
     return product_validate

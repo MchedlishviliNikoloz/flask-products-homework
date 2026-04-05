@@ -69,7 +69,7 @@ def get_products_page():
 @app.route("/add-product", methods=["GET", "POST"])
 def add_product():
     if request.method == "POST":
-        product_add = add_product_service({'name': request.form.get('name'), 'price': int(request.form.get('price'))}, products)
+        product_add = add_product_service({'name': request.form.get('name'), 'price': request.form.get('price')}, products)
         if not product_add['success']:
             return render_template("add_product.html", errors=product_add['errors'])
         return redirect(url_for("index"))
