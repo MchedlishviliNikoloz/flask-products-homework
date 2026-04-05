@@ -1,5 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for
 
+from validators.product_validator import validate_product, validate_filters
+from services.product_service import get_all_products
+from services.product_service import add_product as add_product_service
+from services.product_service import get_product_by_id as get_product_by_id_service
+
 app = Flask(__name__)
 
 products = [
@@ -19,54 +24,54 @@ def index():
 @app.route("/api/products")
 @app.route("/api/products/<search>")
 def get_products(search: str = None):
-    result = products
-    min_price, max_price = request.args.get("min_price"), request.args.get("max_price")
-    limit = request.args.get("limit")
+    filter_validate = validate_filters(request.args)
+    if filter_validate['success']:
+        filters = {}
+        if search:
+            filters['search'] = search
+        if request.args.get("min_price"):
+            filters['min_price'] = int(request.args.get("min_price"))
+        if request.args.get("max_price"):
+            filters['max_price'] = int(request.args.get("max_price"))
+        if request.args.get("limit"):
+            filters['limit'] = int(request.args.get("limit"))
 
-    if search is not None:
-        result = [item for item in result if search.lower() in item['name'].lower()]
+        result = get_all_products(filters, products)
+        return result
 
-    if min_price:
-        result = [item for item in result if int(min_price) <= item['price']]
-
-    if max_price:
-        result = [item for item in result if int(max_price) >= item['price']]
-
-    if limit:
-        result = result[:int(limit)]
-
-    return result
+    return filter_validate
 
 @app.route("/api/products/id/<int:id>")
 def get_product_by_id(id: int):
-    for item in products:
-        if id == item['id']:
-            return item
+    result = get_product_by_id_service(id, products)
+    if result is not None:
+        return result
     return {"error": "Product not found"}
 
 @app.route("/products")
 def get_products_page():
-    min_price, max_price = request.args.get("min_price"), request.args.get("max_price")
-    result = products
-    if min_price:
-        result = [item for item in result if int(min_price) <= item['price']]
+    filter_validate = validate_filters(request.args)
+    result = None
+    if filter_validate['success']:
+        filters = {}
+        if request.args.get("min_price"):
+            filters['min_price'] = int(request.args.get("min_price"))
+        if request.args.get("max_price"):
+            filters['max_price'] = int(request.args.get("max_price"))
+        if request.args.get("limit"):
+            filters['limit'] = int(request.args.get("limit"))
+        result = get_all_products(filters, products)
 
-    if max_price:
-        result = [item for item in result if int(max_price) >= item['price']]
-
-    return render_template("index.html", items=result)
+    if result is not None:
+        return render_template("index.html", items=result)
+    return render_template("index.html", errors=filter_validate['errors'])
 
 @app.route("/add-product", methods=["GET", "POST"])
 def add_product():
     if request.method == "POST":
-        p_name = request.form.get('name')
-        p_price = request.form.get('price')
-        p_id = len(products) + 1
-        products.append({
-            'id': p_id,
-            'name': p_name,
-            'price': int(p_price)
-        })
+        product_add = add_product_service({'name': request.form.get('name'), 'price': int(request.form.get('price'))}, products)
+        if not product_add['success']:
+            return render_template("add_product.html", errors=product_add['errors'])
         return redirect(url_for("index"))
 
     return render_template("add_product.html")

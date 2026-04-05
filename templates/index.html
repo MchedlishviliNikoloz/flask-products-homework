@@ -66,6 +66,7 @@
         <form method="GET" action="/products" style="margin-bottom: 25px; display: flex; gap: 10px; justify-content: center;">
             <input type="number" name="min_price" placeholder="Min price" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;">
             <input type="number" name="max_price" placeholder="Max price" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;">
+            <input type="number" name="limit" placeholder="limit" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;">
             <button type="submit" style="padding: 8px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer;">Filter</button>
         </form>
 
@@ -84,6 +85,10 @@
                         ${{ item.price }}
                     </div>
                 </div>
+            {% endfor %}
+        {% elif errors %}
+            {% for error in errors %}
+                <p style="color: red;">{{ error }}</p>
             {% endfor %}
         {% else %}
             No Products.
