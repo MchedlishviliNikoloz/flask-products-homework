@@ -4,6 +4,7 @@ from validators.product_validator import validate_product, validate_filters
 from services.product_service import get_all_products
 from services.product_service import add_product as add_product_service
 from services.product_service import get_product_by_id as get_product_by_id_service
+from services.response_service import make_response
 
 app = Flask(__name__)
 
@@ -37,16 +38,17 @@ def get_products(search: str = None):
             filters['limit'] = int(request.args.get("limit"))
 
         result = get_all_products(filters, products)
-        return result
+        message = "Products successfully found" if result else "No product with this name"
+        return make_response(filter_validate['success'], data=result, message=message)
 
-    return filter_validate
+    return make_response(filter_validate['success'], message=filter_validate['errors'])
 
 @app.route("/api/products/id/<int:id>")
 def get_product_by_id(id: int):
     result = get_product_by_id_service(id, products)
     if result is not None:
-        return result
-    return {"error": "Product not found"}
+        return make_response(True, data=result, message=f"Found product with ID {id}")
+    return make_response(False, message=f"Product not found with ID {id}")
 
 @app.route("/products")
 def get_products_page():
@@ -75,6 +77,47 @@ def add_product():
         return redirect(url_for("index"))
 
     return render_template("add_product.html")
+
+@app.route("/api/products/<int:product_id>", methods=["PUT"])
+def update_product_data(product_id: int):
+    data = request.json
+    if product_id and isinstance(product_id, int):
+        product = get_product_by_id_service(product_id, products)
+        name, price = data.get("name"), data.get("price")
+
+        if product is not None:
+            for pr in products:
+                if product_id == pr["id"]:
+                    pr["name"] = name
+                    pr["price"] = price
+
+                    return make_response(True, data=products, message=f"Product with id {product_id} successfully updated")
+
+        return make_response(False, message=f"Product with id {product_id} was not found!")
+
+    return make_response(False, message="user id param is not valid, try again!")
+
+
+@app.route("/api/products/<int:product_id>", methods=["PATCH"])
+def partial_update_product_data(product_id: int):
+    data = request.json
+    if product_id and isinstance(product_id, int):
+        product = get_product_by_id_service(product_id, products)
+        name, price = data.get("name"), data.get("price")
+
+        if product is not None:
+            for pr in products:
+                if product_id == pr["id"]:
+                    pr["name"] = name if name else product["name"]
+                    pr["price"] = price if price else product["price"]
+
+                    return make_response(True, data=products,
+                                         message=f"Product with id {product_id} successfully updated")
+
+        return make_response(False, message=f"Product with id {product_id} was not found!")
+
+    return make_response(False, message="user id param is not valid, try again!")
+
 
 if __name__ == "__main__":
     app.run(debug=True)
