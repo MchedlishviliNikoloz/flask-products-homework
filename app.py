@@ -5,22 +5,29 @@ from services.product_service import get_all_products
 from services.product_service import add_product as add_product_service
 from services.product_service import get_product_by_id as get_product_by_id_service
 from services.response_service import make_response
+from database import db
+from models.product import Product
 
 app = Flask(__name__)
 
-products = [
-    {"id": 1, "name": "Laptop", "price": 1200},
-    {"id": 2, "name": "Phone", "price": 900},
-    {"id": 3, "name": "Tablet", "price": 600},
-    {"id": 4, "name": "Phone", "price": 1100},
-    {"id": 5, "name": "Television", "price": 2600},
-    {"id": 6, "name": "Laptop", "price": 1500},
-    {"id": 7, "name": "Tablet", "price": 800},
-]
+# products = [
+#     {"id": 1, "name": "Laptop", "price": 1200},
+#     {"id": 2, "name": "Phone", "price": 900},
+#     {"id": 3, "name": "Tablet", "price": 600},
+#     {"id": 4, "name": "Phone", "price": 1100},
+#     {"id": 5, "name": "Television", "price": 2600},
+#     {"id": 6, "name": "Laptop", "price": 1500},
+#     {"id": 7, "name": "Tablet", "price": 800},
+# ]
+DB_PATH = "products.db"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
+db.init_app(app)
+
 
 @app.route("/")
 def index():
-    return render_template("index.html", items=products)
+    return render_template("index.html", items=Product.query.all())
 
 @app.route("/api/products")
 @app.route("/api/products/<search>")
@@ -37,7 +44,7 @@ def get_products(search: str = None):
         if request.args.get("limit"):
             filters['limit'] = int(request.args.get("limit"))
 
-        result = get_all_products(filters, products)
+        result = get_all_products(filters)
         message = "Products successfully found" if result else "No product with this name"
         return make_response(filter_validate['success'], data=result, message=message)
 
@@ -45,7 +52,7 @@ def get_products(search: str = None):
 
 @app.route("/api/products/id/<int:id>")
 def get_product_by_id(id: int):
-    result = get_product_by_id_service(id, products)
+    result = get_product_by_id_service(id)
     if result is not None:
         return make_response(True, data=result, message=f"Found product with ID {id}")
     return make_response(False, message=f"Product not found with ID {id}")
@@ -62,7 +69,7 @@ def get_products_page():
             filters['max_price'] = int(request.args.get("max_price"))
         if request.args.get("limit"):
             filters['limit'] = int(request.args.get("limit"))
-        result = get_all_products(filters, products)
+        result = get_all_products(filters)
 
     if result is not None:
         return render_template("index.html", items=result)
@@ -71,7 +78,7 @@ def get_products_page():
 @app.route("/add-product", methods=["GET", "POST"])
 def add_product():
     if request.method == "POST":
-        product_add = add_product_service({'name': request.form.get('name'), 'price': request.form.get('price')}, products)
+        product_add = add_product_service({'name': request.form.get('name'), 'price': request.form.get('price')})
         if not product_add['success']:
             return render_template("add_product.html", errors=product_add['errors'])
         return redirect(url_for("index"))
@@ -82,16 +89,14 @@ def add_product():
 def update_product_data(product_id: int):
     data = request.json
     if product_id and isinstance(product_id, int):
-        product = get_product_by_id_service(product_id, products)
+        product = get_product_by_id_service(product_id)
         name, price = data.get("name"), data.get("price")
 
         if product is not None:
-            for pr in products:
-                if product_id == pr["id"]:
-                    pr["name"] = name
-                    pr["price"] = price
-
-                    return make_response(True, data=products, message=f"Product with id {product_id} successfully updated")
+            product.name = name
+            product.price = price
+            db.session.commit()
+            return make_response(True, data=product.to_dict(), message=f"Product with id {product_id} successfully updated")
 
         return make_response(False, message=f"Product with id {product_id} was not found!")
 
@@ -102,17 +107,29 @@ def update_product_data(product_id: int):
 def partial_update_product_data(product_id: int):
     data = request.json
     if product_id and isinstance(product_id, int):
-        product = get_product_by_id_service(product_id, products)
+        product = get_product_by_id_service(product_id)
         name, price = data.get("name"), data.get("price")
 
         if product is not None:
-            for pr in products:
-                if product_id == pr["id"]:
-                    pr["name"] = name if name else product["name"]
-                    pr["price"] = price if price else product["price"]
+            product.name = name if name else product.name
+            product.price = price if price else product.price
+            db.session.commit()
+            return make_response(True, data=product.to_dict(), message=f"Product with id {product_id} successfully updated")
 
-                    return make_response(True, data=products,
-                                         message=f"Product with id {product_id} successfully updated")
+        return make_response(False, message=f"Product with id {product_id} was not found!")
+
+    return make_response(False, message="user id param is not valid, try again!")
+
+
+@app.route("/api/products/<int:product_id>", methods=["DELETE"])
+def delete_product(product_id: int):
+    if product_id and isinstance(product_id, int):
+        product = get_product_by_id_service(product_id)
+
+        if product is not None:
+            db.session.delete(product)
+            db.session.commit()
+            return make_response(True, message=f"Product with id {product_id} successfully deleted")
 
         return make_response(False, message=f"Product with id {product_id} was not found!")
 
@@ -120,4 +137,6 @@ def partial_update_product_data(product_id: int):
 
 
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
